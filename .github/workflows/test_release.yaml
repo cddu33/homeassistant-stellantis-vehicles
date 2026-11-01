@@ -1,0 +1,41 @@
+name: Create test release
+
+# Push a tag named test-<anything> on any branch to publish a HACS-installable
+# pre-release (with the stellantis_vehicles.zip asset HACS expects, see
+# hacs.json) built from that exact commit.
+on:
+  push:
+    tags:
+      - "test-*"
+
+permissions:
+  contents: write
+
+env:
+  INTEGRATION_SLUG: stellantis_vehicles
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set manifest version to the tag
+        run: |
+          manifest="custom_components/${INTEGRATION_SLUG}/manifest.json"
+          jq --arg v "${GITHUB_REF_NAME}" '.version = $v' "$manifest" > manifest.tmp
+          mv manifest.tmp "$manifest"
+
+      - name: Create zip
+        run: |
+          cd "custom_components/${INTEGRATION_SLUG}"
+          zip -r "${GITHUB_WORKSPACE}/${INTEGRATION_SLUG}.zip" ./
+
+      - name: Create pre-release
+        uses: softprops/action-gh-release@v2
+        with:
+          prerelease: true
+          name: ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          body: "Test build of `${{ github.sha }}`."
+          files: ${{ env.INTEGRATION_SLUG }}.zip
