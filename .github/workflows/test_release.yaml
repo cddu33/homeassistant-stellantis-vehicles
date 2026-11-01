@@ -1,9 +1,12 @@
-name: Create test release
+name: Attach HACS zip
 
-# Push a tag named test-<anything> on any branch to publish a HACS-installable
-# pre-release (with the stellantis_vehicles.zip asset HACS expects, see
-# hacs.json) built from that exact commit.
+# Makes any release installable through HACS (hacs.json expects a
+# stellantis_vehicles.zip asset), built from the release's own commit:
+# - publish a release from the GitHub UI on any branch: the zip is attached;
+# - or push a tag named test-<anything>: a pre-release is created with it.
 on:
+  release:
+    types: [published]
   push:
     tags:
       - "test-*"
@@ -15,7 +18,7 @@ env:
   INTEGRATION_SLUG: stellantis_vehicles
 
 jobs:
-  release:
+  zip:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,6 +35,7 @@ jobs:
           zip -r "${GITHUB_WORKSPACE}/${INTEGRATION_SLUG}.zip" ./
 
       - name: Create pre-release
+        if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
           prerelease: true
@@ -39,3 +43,9 @@ jobs:
           tag_name: ${{ github.ref_name }}
           body: "Test build of `${{ github.sha }}`."
           files: ${{ env.INTEGRATION_SLUG }}.zip
+
+      - name: Attach zip to release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${GITHUB_REF_NAME}" "${INTEGRATION_SLUG}.zip" --clobber --repo "${GITHUB_REPOSITORY}"
