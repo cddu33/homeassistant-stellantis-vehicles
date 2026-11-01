@@ -211,6 +211,18 @@ COMMAND_STATUS_SUCCESS = ("0", "1")
 # dropped before the vehicle's actual response could arrive).
 PENDING_ACTION_TIMEOUT = 60
 
+# Vehicle data (REST snapshot or MQTT event) timestamped after a command was
+# sent is held back until that command reaches a final status, then dropped
+# if the command failed: a vehicle woken up only partially by a command that
+# then times out (300) can report bogus values (e.g. charging.plugged True on
+# an unplugged car). Held at most this many seconds after sending (Stellantis
+# answers 300 about 2 minutes after the request), then applied anyway.
+COMMAND_DATA_HOLD_TIMEOUT = 180
+
+# Seconds added on both ends of a command's window (send time to final
+# status) when matching vehicle data timestamps against it, to absorb clock skew between HA and Stellantis.
+COMMAND_DATA_CLOCK_MARGIN = 5
+
 # Backoff schedule (seconds) for the MQTT token refresh after a transient
 # Stellantis backend failure. Capped at the last step so a prolonged outage is
 # retried every ~15 min instead of once a minute.

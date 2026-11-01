@@ -35,6 +35,9 @@ from .const import (
     EMPTY_STATUS_LIMIT,
     COMMAND_HISTORY_LIMIT,
     COMMAND_STATUS_STILL_IN_PROGRESS,
+    COMMAND_STATUS_SUCCESS,
+    COMMAND_DATA_HOLD_TIMEOUT,
+    COMMAND_DATA_CLOCK_MARGIN,
     PENDING_ACTION_TIMEOUT,
     KWH_CORRECTION
 )
@@ -78,6 +81,9 @@ class StellantisVehicleCoordinator(DataUpdateCoordinator):
         # commands, or None while none is blocking. Set as soon as that
         # command is sent and cleared once it reaches a final status.
         self._pending_action_id: str | None = None
+        # MQTT vehicle events received while a command is still unresolved
+        # (see _command_data_verdict), replayed once it is resolved.
+        self._held_mqtt_events: list[dict[str, Any]] = []
         self._last_trip = None
 #        self._total_trip = None
         self._manage_charge_limit_sent = False
@@ -144,6 +150,19 @@ class StellantisVehicleCoordinator(DataUpdateCoordinator):
 
         if self._is_stale(new_data):
             return self.data
+
+        verdict = self._command_data_verdict(parse_timestamp(new_data.get("updatedAt")))
+        if verdict:
+            _LOGGER.debug(
+                "Vehicle status updated at %s %s, skipping sensor update",
+                new_data.get("updatedAt"),
+                "was received during a failed command" if verdict == "discard" else "is held until the pending command is resolved",
+            )
+            return self.data
+
+        # Nothing is held any more (e.g. the command expired without a final
+        # status): let the held MQTT events through.
+        self._replay_held_mqtt_events()
 
         if self._mqtt_state:
             self._overlay_mqtt_state(new_data)
@@ -308,6 +327,15 @@ class StellantisVehicleCoordinator(DataUpdateCoordinator):
         battery level and range stay REST-only, as the MQTT values lag
         behind REST and spike (checked against a month of both).
         """
+        verdict = self._command_data_verdict(parse_timestamp(event.get("timestamp")))
+        if verdict == "discard":
+            _LOGGER.debug("Discarding MQTT event received during a failed command (timestamp %s)", event.get("timestamp"))
+            return
+        if verdict == "hold":
+            _LOGGER.debug("Holding MQTT event until the pending command is resolved (timestamp %s)", event.get("timestamp"))
+            self._held_mqtt_events.append(event)
+            return
+
         if not self._accept_mqtt_event_order(event):
             return
 
@@ -323,6 +351,38 @@ class StellantisVehicleCoordinator(DataUpdateCoordinator):
             # Not async_set_updated_data(): that would reset the REST poll timer.
             self.data = data
         self.async_update_listeners()
+
+    def _command_data_verdict(self, timestamp:datetime | None) -> str | None:
+        """ How to treat vehicle data timestamped ``timestamp`` given the sent commands.
+
+        "discard" if it falls within a command that ended in error (a vehicle
+        only partially woken up by such a command can report bogus values),
+        "hold" if it is newer than a command that is still unresolved and not
+        older than COMMAND_DATA_HOLD_TIMEOUT, None to apply it as usual.
+        """
+        if timestamp is None:
+            return None
+        now = get_datetime()
+        verdict = None
+        for command in self._commands_history.values():
+            sent_at = command.get("sent_at")
+            if sent_at is None:
+                continue
+            margin = timedelta(seconds=COMMAND_DATA_CLOCK_MARGIN)
+            start = sent_at - margin
+            final_at = command.get("final_at")
+            if final_at is not None:
+                if command.get("failed") and start <= timestamp <= final_at + margin:
+                    return "discard"
+            elif timestamp >= start and (now - sent_at).total_seconds() < COMMAND_DATA_HOLD_TIMEOUT:
+                verdict = "hold"
+        return verdict
+
+    def _replay_held_mqtt_events(self) -> None:
+        """ Re-apply the held MQTT events; each one is judged again (applied, dropped or held). """
+        held, self._held_mqtt_events = self._held_mqtt_events, []
+        for event in held:
+            self.apply_mqtt_event(event)
 
     def _accept_mqtt_event_order(self, event:dict[str, Any]) -> bool:
         """ Reject an MQTT event older than the last one accepted for this vehicle.
@@ -482,8 +542,14 @@ class StellantisVehicleCoordinator(DataUpdateCoordinator):
                 disabled_name = self._commands_history[action_id]["name"]
                 if disabled_name not in self._disabled_commands:
                     self._disabled_commands.append(disabled_name)
-            if update not in COMMAND_STATUS_STILL_IN_PROGRESS and self._pending_action_id == action_id:
-                self._pending_action_id = None
+            if update not in COMMAND_STATUS_STILL_IN_PROGRESS:
+                command = self._commands_history[action_id]
+                if "sent_at" in command and "final_at" not in command:
+                    command["final_at"] = get_datetime()
+                    command["failed"] = update not in COMMAND_STATUS_SUCCESS
+                    self._replay_held_mqtt_events()
+                if self._pending_action_id == action_id:
+                    self._pending_action_id = None
         self.async_update_listeners()
 
     def update_command_history_rate_limit(self, name):
