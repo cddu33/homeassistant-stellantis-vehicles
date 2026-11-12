@@ -365,6 +365,9 @@
       "charge_stop": {
         "name": "Arrêter recharge"
       },
+      "charge_delayed": {
+        "name": "Recharge différée"
+      },
       "charge_limit_on": {
         "name": "Activer limite de recharge 80%"
       },

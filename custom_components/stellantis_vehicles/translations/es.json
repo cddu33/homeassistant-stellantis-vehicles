@@ -365,6 +365,9 @@
       "charge_stop": {
         "name": "Detener carga"
       },
+      "charge_delayed": {
+        "name": "Carga diferida"
+      },
       "charge_limit_on": {
         "name": "Límite de carga al 80% activado"
       },

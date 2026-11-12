@@ -364,6 +364,9 @@
       "charge_stop": {
         "name": "Stop ricarica"
       },
+      "charge_delayed": {
+        "name": "Ricarica differita"
+      },
       "charge_limit_on": {
         "name": "Attiva ricarica limitata 80%"
       },

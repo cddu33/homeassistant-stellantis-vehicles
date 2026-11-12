@@ -344,6 +344,9 @@
       "charge_stop": {
         "name": "Ładowanie baterii stop"
       },
+      "charge_delayed": {
+        "name": "Ładowanie opóźnione"
+      },
       "preconditioning_start": {
         "name": "Ogrzewanie/chłodzenie wstępne start"
       },

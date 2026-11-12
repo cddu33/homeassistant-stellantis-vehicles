@@ -332,6 +332,9 @@
       "charge_stop": {
         "name": "Lopeta lataus"
       },
+      "charge_delayed": {
+        "name": "Viivästetty lataus"
+      },
       "preconditioning_start": {
         "name": "Käynnistä esi-ilmastointi"
       },

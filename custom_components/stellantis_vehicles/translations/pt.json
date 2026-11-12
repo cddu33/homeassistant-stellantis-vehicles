@@ -210,6 +210,9 @@
       "charge_stop": {
         "name": "Parar carregamento"
       },
+      "charge_delayed": {
+        "name": "Carregamento diferido"
+      },
       "preconditioning_start": {
         "name": "Iniciar pré-condicionamento"
       },

@@ -204,6 +204,9 @@
       "charge_stop": {
         "name": "Stop opladning"
       },
+      "charge_delayed": {
+        "name": "Forsinket opladning"
+      },
       "preconditioning_start": {
         "name": "Forvarmning/forkøling start"
       },

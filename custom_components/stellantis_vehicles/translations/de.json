@@ -360,6 +360,9 @@
       "charge_stop": {
         "name": "Fahrzeug laden stoppen"
       },
+      "charge_delayed": {
+        "name": "Verzögertes Laden"
+      },
       "preconditioning_start": {
         "name": "Vorklimatisierung starten"
       },

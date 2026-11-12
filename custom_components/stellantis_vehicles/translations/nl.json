@@ -301,6 +301,9 @@
       "charge_stop": {
         "name": "Stop laden"
       },
+      "charge_delayed": {
+        "name": "Uitgesteld laden"
+      },
       "preconditioning_start": {
         "name": "Start voorconditioneren"
       },

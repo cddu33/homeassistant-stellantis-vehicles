@@ -365,6 +365,9 @@
       "charge_stop": {
         "name": "Charge stop"
       },
+      "charge_delayed": {
+        "name": "Delayed charge"
+      },
       "charge_limit_on": {
         "name": "Charge limit 80% on"
       },

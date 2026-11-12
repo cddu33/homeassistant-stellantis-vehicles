@@ -103,6 +103,14 @@ async def async_setup_entry(hass:HomeAssistant, entry, async_add_entities) -> No
             entities.extend([StellantisChargingStartStopButton(coordinator, description, "delayed")])
 
             description = ButtonEntityDescription(
+                name = "charge_delayed",
+                key = "charge_delayed",
+                translation_key = "charge_delayed",
+                icon = "mdi:battery-clock-outline"
+            )
+            entities.extend([StellantisChargingDelayedButton(coordinator, description, "delayed")])
+
+            description = ButtonEntityDescription(
                 name = "charge_limit_on",
                 key = "charge_limit_on",
                 translation_key = "charge_limit_on",
@@ -151,6 +159,21 @@ class StellantisChargingStartStopButton(StellantisBaseActionButton):
         charging_finished = self._coordinator._sensors.get("battery_charging") == "Finished"
         current_battery = self._coordinator._sensors.get("battery")
         return super().available and self._coordinator._sensors.get("time_battery_charging_start") and (charging_inprogress_stopped or (charging_finished and current_battery and int(float(current_battery)) < 100))
+
+    async def async_press(self):
+        await self._coordinator.send_charge_command(self.name, False, self._action)
+
+class StellantisChargingDelayedButton(StellantisBaseActionButton):
+    """ Switch the vehicle to delayed charging at the "battery_charging_start" time.
+
+    Unlike "charge_stop", which sends the same command, this one is also
+    available while no charge is running (plugged but idle, or unplugged), so
+    the vehicle waits for the delayed time instead of charging as soon as it
+    is plugged in.
+    """
+    @property
+    def available(self):
+        return super().available and self._coordinator._sensors.get("time_battery_charging_start") is not None
 
     async def async_press(self):
         await self._coordinator.send_charge_command(self.name, False, self._action)

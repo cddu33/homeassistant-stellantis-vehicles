@@ -313,6 +313,7 @@
       "lights": { "name": "Luči" },
       "charge_start": { "name": "Začni polnjenje" },
       "charge_stop": { "name": "Ustavi polnjenje" },
+      "charge_delayed": { "name": "Odloženo polnjenje" },
       "charge_limit_on": { "name": "Vključi omejitev polnjenja na 80 %" },
       "charge_limit_off": { "name": "Izključi omejitev polnjenja na 80 %" },
       "preconditioning_start": { "name": "Začni predpripravo" },

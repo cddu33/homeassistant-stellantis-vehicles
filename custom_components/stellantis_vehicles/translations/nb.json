@@ -210,6 +210,9 @@
       "charge_stop": {
         "name": "Lading stopp"
       },
+      "charge_delayed": {
+        "name": "Forsinket lading"
+      },
       "preconditioning_start": {
         "name": "Forvarming start"
       },
