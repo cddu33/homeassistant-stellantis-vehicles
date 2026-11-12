@@ -1,0 +1,59 @@
+name: Attach HACS zip
+
+# Makes any release installable through HACS (hacs.json expects a
+# stellantis_vehicles.zip asset), built from the release's own commit:
+# - publish a release from the GitHub UI on any branch: the zip is attached;
+# - or push a tag named test-<anything>: a pre-release is created with it.
+on:
+  release:
+    types: [published]
+  push:
+    tags:
+      - "test-*"
+
+permissions:
+  contents: write
+
+env:
+  INTEGRATION_SLUG: stellantis_vehicles
+
+jobs:
+  zip:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Home Assistant refuses to load a custom integration whose version is
+      # not a valid version (e.g. "test-2026.11.1"), so only use the tag when
+      # it is one once the "test-"/"v" prefix is dropped.
+      - name: Set manifest version from the tag
+        run: |
+          manifest="custom_components/${INTEGRATION_SLUG}/manifest.json"
+          version="${GITHUB_REF_NAME#test-}"
+          version="${version#v}"
+          if [[ "$version" =~ ^[0-9]+(\.[0-9]+)*(-[0-9A-Za-z.]+)?$ ]]; then
+            jq --arg v "$version" '.version = $v' "$manifest" > manifest.tmp
+            mv manifest.tmp "$manifest"
+          fi
+          echo "Manifest version: $(jq -r .version "$manifest")"
+
+      - name: Create zip
+        run: |
+          cd "custom_components/${INTEGRATION_SLUG}"
+          zip -r "${GITHUB_WORKSPACE}/${INTEGRATION_SLUG}.zip" ./
+
+      - name: Create pre-release
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          prerelease: true
+          name: ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          body: "Test build of `${{ github.sha }}`."
+          files: ${{ env.INTEGRATION_SLUG }}.zip
+
+      - name: Attach zip to release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${GITHUB_REF_NAME}" "${INTEGRATION_SLUG}.zip" --clobber --repo "${GITHUB_REPOSITORY}"
