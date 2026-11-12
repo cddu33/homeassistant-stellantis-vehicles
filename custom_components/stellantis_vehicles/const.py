@@ -1,3 +1,4 @@
+from datetime import timedelta
 import os
 import json
 
@@ -186,6 +187,13 @@ SUPPORTED_FEATURES_RETRY_DELAYS = (30, 120, 600)
 # Consecutive empty vehicle-status responses before the account vehicle list is
 # re-fetched to check whether the vehicle was unpaired.
 EMPTY_STATUS_LIMIT = 3
+
+# How far back a vehicle timestamp (REST updatedAt, MQTT event date) may go
+# before it is treated as a vehicle clock reset rather than older data. A
+# vehicle without GPS time sync can fall back to a default date (seen: 2023);
+# without this, every later update would be discarded as "not newer" until a
+# restart.
+CLOCK_JUMP_TOLERANCE = timedelta(hours=1)
 
 # Maximum number of entries kept in a coordinator's command history. Without a
 # cap, every sent command would stay in memory (and be re-sorted on every

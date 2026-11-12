@@ -36,6 +36,7 @@ from .const import (
     COMMAND_HISTORY_LIMIT,
     COMMAND_STATUS_STILL_IN_PROGRESS,
     PENDING_ACTION_TIMEOUT,
+    CLOCK_JUMP_TOLERANCE,
     KWH_CORRECTION
 )
 
@@ -221,6 +222,15 @@ class StellantisVehicleCoordinator(DataUpdateCoordinator):
         if current_dt is None or new_dt is None:
             _LOGGER.debug("Invalid updatedAt values, proceeding with update without timestamp comparison")
             return False
+        if current_dt - new_dt > CLOCK_JUMP_TOLERANCE:
+            # Far older than what we hold: the vehicle clock went back (e.g. a
+            # vehicle without GPS falling back to 2023), not a late response.
+            # Skipping would freeze every entity until a restart.
+            _LOGGER.warning(
+                "Vehicle %s reported updatedAt %s, older than the last one (%s): its clock was probably reset, accepting the data",
+                self._vehicle["vin"], new_data["updatedAt"], self.data["updatedAt"],
+            )
+            return False
         if new_dt <= current_dt:
             _LOGGER.debug("API did not return updated vehicle data, skipping sensor update")
             return True
@@ -341,7 +351,15 @@ class StellantisVehicleCoordinator(DataUpdateCoordinator):
             return True
 
         key = (timestamp, counter)
-        if self._mqtt_last_key is not None and key < self._mqtt_last_key:
+        if self._mqtt_last_key is not None and self._mqtt_last_key[0] - timestamp > CLOCK_JUMP_TOLERANCE:
+            # Far older than the last event: the vehicle clock went back (e.g.
+            # no GPS time, falling back to 2023). Restart the sequence instead
+            # of discarding every event from now on.
+            _LOGGER.warning(
+                "MQTT event for %s dated %s, older than the last one (%s): vehicle clock probably reset, accepting it",
+                self._vehicle["vin"], event.get("timestamp"), self._mqtt_last_key[0].isoformat(),
+            )
+        elif self._mqtt_last_key is not None and key < self._mqtt_last_key:
             _LOGGER.debug(
                 "Discarding out-of-order MQTT event for %s (key %s < last accepted %s)",
                 self._vehicle["vin"], key, self._mqtt_last_key,
